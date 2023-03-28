@@ -1,4 +1,5 @@
 import spotipy
+import spotipy.util as util
 from spotipy.oauth2 import SpotifyOAuth
 import base64
 from requests import post, get
@@ -75,7 +76,10 @@ layout = [
         [sg.Submit(), sg.Cancel()],
         [sg.Listbox(
             values = [], enable_events=True, size = (40, 20), key="Output"
-        )]
+        )],
+        [sg.Text("Enter Playlist Name: ")], 
+         [sg.Input(key="Name", size= (15, 1))],
+         [sg.Button("Create Playlist")]
           ]
 window = sg.Window("Playlist Creator", layout)
 
@@ -87,7 +91,27 @@ while True:
         for item in trackList:
             artistSongList.append(f"{item['name']} by {item['artists'][0]['name']}")
         window['Output'].update(artistSongList)
-
+    if event == "Create Playlist":
+        username = "jackodom"
+        playlistName = values["Name"]
+        token = util.prompt_for_user_token(
+            username=username,
+            scope='playlist-modify-public', 
+            client_id=CLIENT_ID, 
+            client_secret=CLIENT_SECRET, 
+            redirect_uri="http://localhost:8888/callback")
+        sp = spotipy.Spotify(auth=token)
+        sp.user_playlist_create(username, name = playlistName)
+        playlists = sp.user_playlists(username)
+        playlistID = ''
+        for playlist in playlists['items']:  # iterate through playlists I follow
+            if playlist['name'] == playlistName:  # filter for newly created playlist
+                playlistID = playlist['id']
+        trackIDs = []
+        for item in trackList:
+            trackIDs.append(item['id'])
+        sp.user_playlist_add_tracks(username, playlistID, trackIDs)
+        break
     if event == sg.WIN_CLOSED or event == "Cancel":
         break
 
