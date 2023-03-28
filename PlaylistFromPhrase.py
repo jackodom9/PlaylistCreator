@@ -4,6 +4,7 @@ import base64
 from requests import post, get
 import json
 import config
+import PySimpleGUI as sg
 
 # Client side codes necessary to access API
 CLIENT_ID = config.CLIENT_ID
@@ -17,7 +18,7 @@ def getToken():
 
     url = "https://accounts.spotify.com/api/token"
     headers = {
-        "Authorization": "Basic" + auth_base64,
+        "Authorization": "Basic " + auth_base64,
         "Content-Type": "application/x-www-form-urlencoded"
     }
     data = {"grant_type": "client_credentials"}
@@ -27,12 +28,12 @@ def getToken():
     return token
 
 def getAuthHeader(token):
-    return {"Authorization": "Bearer" + token}
+    return {"Authorization": "Bearer " + token}
 
 def searchForSongs(token, input, offset):
     url = "https://api.spotify.com/v1/search"
     headers = getAuthHeader(token)
-    query = f"?q={input}&type=track&market=US&limit=50&offset={offset}"
+    query = f"?q={input}&type=track&market=US&limit=5&offset={offset}"
     query_url = url + query
     result = get(query_url, headers=headers)
     json_result = json.loads(result.content)
@@ -48,20 +49,46 @@ def cleanInput(inputStr):
             exit()
     outputList = outputStr.split()
     return outputList
-# temporary command line input
 
-input = input("Please enter input: \n")
+def findTracklist(input):
+    inputList = cleanInput(input)
+    trackList = []
+    token = getToken()
+    print("token: " + token)
+    for word in inputList:
+        search = searchForSongs(token, word, 0)
+        for item in search['tracks']['items']:
+            if word.strip().lower() in item['name'].strip().lower().split():
+                trackList.append(item)
+                break
+    return trackList
 
-inputList = cleanInput(input)
+# temporary command line output
+def tracklistNames(trackList):
+    for item in trackList:
+        print(f"\n{item['name']} by {item['artists'][0]['name']}")
 
-trackList = []
-token = getToken()
-print("token: " + token)
-for word in inputList:
-    search = searchForSongs(token, word, 0)
-    for item in search['tracks']['items']:
-        if word.strip().lower() in item['name'].strip().lower():
-            trackList.append(item)
-            break
-for item in trackList:
-    print(f"\n{item['name']} by {item['artists'][0]['name']}")
+## GUI
+layout = [
+        [sg.Text("Please enter phrase: ")], 
+        [sg.Input(key="Input", size =(15, 1))],
+        [sg.Submit(), sg.Cancel()],
+        [sg.Listbox(
+            values = [], enable_events=True, size = (40, 20), key="Output"
+        )]
+          ]
+window = sg.Window("Playlist Creator", layout)
+
+while True:
+    event, values = window.read()
+    if event == "Submit":
+        trackList = findTracklist(values["Input"])
+        artistSongList = []
+        for item in trackList:
+            artistSongList.append(f"{item['name']} by {item['artists'][0]['name']}")
+        window['Output'].update(artistSongList)
+
+    if event == sg.WIN_CLOSED or event == "Cancel":
+        break
+
+window.close()
